@@ -1,0 +1,29 @@
+body {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+    }
+    .header {
+      background: linear-gradient(90deg, #198754, #157347);
+      color: white;
+      padding: 2rem 0;
+      margin-bottom: 2rem;
+      border-radius: 0 0 20px 20px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    .card {
+      border: none;
+      border-radius: 15px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      max-width: 600px;
+      margin: 2rem auto;
+    }
+    .icon-large {
+      font-size: 3.5rem;
+      color: #198754;
+    }
+    footer {
+      margin-top: 4rem;
+      padding: 2rem 0;
+      color: #6c757d;
+      text-align: center;
+    }
