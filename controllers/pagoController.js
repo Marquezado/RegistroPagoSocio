@@ -1,82 +1,51 @@
 const db = require("../config/db");
 const { generarReciboPDF } = require("../utils/pdfGenerator");
 
-const PORCENTAJE_INTERES = 2.0; // 2% mensual
-
-const calcularInteresMora = (fechaVencimiento) => {
-  const hoy = new Date();
-  const vencimiento = new Date(fechaVencimiento);
-  const diffTime = hoy - vencimiento;
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays <= 30) return 0;
-
-  const mesesMora = Math.floor(diffDays / 30);
-  return (mesesMora * PORCENTAJE_INTERES) / 100;
-};
-
 const consultarEstadoCuenta = async (req, res) => {
   const { dni } = req.params;
 
   try {
-    // 1. Buscar socio
     const [socios] = await db.execute(
       'SELECT id, dni, nombre, telefono, tipo_socio FROM socios WHERE dni = ? AND estado = "activo"',
       [dni]
     );
 
     if (socios.length === 0) {
-      return res.json({
-        success: false,
-        message: "Socio no encontrado o inactivo",
-      });
+      return res.json({ success: false, message: "Socio no encontrado o inactivo" });
     }
 
     const socio = socios[0];
 
-    const [facturas] = await db.execute(
-      `
-      SELECT id, fecha_emision, fecha_vencimiento, monto_base 
+    // Facturas no pagadas completamente
+    const [facturas] = await db.execute(`
+      SELECT id, fecha_emision, fecha_vencimiento
       FROM facturas 
       WHERE socio_id = ? AND estado IN ('pendiente', 'parcial')
       ORDER BY fecha_vencimiento ASC
-    `,
-      [socio.id]
-    );
+    `, [socio.id]);
 
     let deudaTotal = 0;
     const facturasConDetalle = [];
 
     for (const factura of facturas) {
-      const interesRate = calcularInteresMora(factura.fecha_vencimiento);
-      const interesMonto = factura.monto_base * interesRate;
+      const [detalles] = await db.execute(`
+        SELECT concepto, monto 
+        FROM detalle_factura 
+        WHERE factura_id = ?
+      `, [factura.id]);
 
-      const [detalles] = await db.execute(
-        "SELECT concepto, monto FROM detalle_factura WHERE factura_id = ?",
-        [factura.id]
-      );
-
-      if (interesMonto > 0) {
-        const conceptoInteres = `Interés por mora (${PORCENTAJE_INTERES}% mensual)`;
-        const existeInteres = detalles.some((d) =>
-          d.concepto.includes("Interés")
-        );
-        if (!existeInteres) {
-          detalles.push({ concepto: conceptoInteres, monto: interesMonto });
-        }
-      }
-
-      const totalFactura = factura.monto_base + interesMonto;
+      const totalFactura = detalles.reduce((sum, d) => sum + Number(d.monto), 0);
       deudaTotal += totalFactura;
 
       facturasConDetalle.push({
         id: factura.id,
         fecha_emision: factura.fecha_emision.toISOString().slice(0, 10),
         fecha_vencimiento: factura.fecha_vencimiento.toISOString().slice(0, 10),
-        detalles: detalles.map((d) => ({
+        detalles: detalles.map(d => ({
           concepto: d.concepto,
-          monto: Number(d.monto),
+          monto: Number(d.monto)
         })),
+        total: totalFactura
       });
     }
 
@@ -86,10 +55,10 @@ const consultarEstadoCuenta = async (req, res) => {
         id: socio.id,
         dni: socio.dni,
         nombre: socio.nombre,
-        telefono: socio.telefono,
+        telefono: socio.telefono || null,
         tipo_socio: socio.tipo_socio,
       },
-      deuda_total: deudaTotal,
+      deuda_total: parseFloat(deudaTotal.toFixed(2)),
       facturas: facturasConDetalle,
     });
   } catch (error) {
@@ -101,71 +70,116 @@ const consultarEstadoCuenta = async (req, res) => {
 const registrarPago = async (req, res) => {
   const { socio_id, monto, metodo } = req.body;
 
+  if (!monto || monto <= 0) {
+    return res.json({ success: false, message: "Monto inválido" });
+  }
+
   let connection;
   try {
     connection = await db.getConnection();
     await connection.beginTransaction();
 
-    const [socios] = await connection.execute("SELECT * FROM socios WHERE id = ?", [socio_id]);
+    // Verificar socio
+    const [socios] = await connection.execute("SELECT id, nombre, dni FROM socios WHERE id = ?", [socio_id]);
     if (socios.length === 0) {
       await connection.rollback();
       return res.json({ success: false, message: "Socio no encontrado" });
     }
     const socio = socios[0];
 
-    const [facturasPendientes] = await connection.execute(
-      `SELECT SUM(monto_base) as total FROM facturas 
-       WHERE socio_id = ? AND estado IN ('pendiente', 'parcial')`,
-      [socio_id]
-    );
-    const deudaActual = Number(facturasPendientes[0].total) || 0;
+    // Calcular deuda actual real (base + intereses persistidos)
+    const [deudaRes] = await connection.execute(`
+      SELECT COALESCE(SUM(df.monto), 0) as total
+      FROM facturas f
+      JOIN detalle_factura df ON f.id = df.factura_id
+      WHERE f.socio_id = ? AND f.estado IN ('pendiente', 'parcial')
+    `, [socio_id]);
+    const deudaActual = Number(deudaRes[0].total) || 0;
 
+    // Insertar pago
     const reciboNum = `REC-${Date.now()}`;
-    const [pagoResult] = await connection.execute(
-      `INSERT INTO pagos (socio_id, monto, metodo_pago, recibo_num, tipo_pago) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [
-        socio_id,
-        monto,
-        metodo,
-        reciboNum,
-        deudaActual > 0 ? "normal" : "adelantado",
-      ]
-    );
-    const pagoId = pagoResult.insertId;
+    const tipoPago = deudaActual > 0 ? "normal" : "adelantado";
 
+    const [pagoResult] = await connection.execute(`
+      INSERT INTO pagos (socio_id, monto, metodo_pago, recibo_num, tipo_pago)
+      VALUES (?, ?, ?, ?, ?)
+    `, [socio_id, monto, metodo, reciboNum, tipoPago]);
+
+    const pagoId = pagoResult.insertId;
+    let restante = monto;
     let detalleAplicado = [];
 
-    if (deudaActual > 0 && monto >= deudaActual) {
-      const [facturas] = await connection.execute(
-        `SELECT id, monto_base FROM facturas 
-         WHERE socio_id = ? AND estado IN ('pendiente', 'parcial')
-         ORDER BY fecha_vencimiento ASC`,
-        [socio_id]
-      );
+    if (deudaActual > 0 && restante > 0) {
+      // Obtener facturas ordenadas por vencimiento (FIFO)
+      const [facturas] = await connection.execute(`
+        SELECT f.id
+        FROM facturas f
+        WHERE f.socio_id = ? AND f.estado IN ('pendiente', 'parcial')
+        ORDER BY f.fecha_vencimiento ASC
+      `, [socio_id]);
 
-      let restante = monto;
       for (const factura of facturas) {
         if (restante <= 0) break;
 
-        const montoAplicar = Math.min(restante, factura.monto_base);
-        await connection.execute(
-          "INSERT INTO pago_factura (pago_id, factura_id, monto_aplicado) VALUES (?, ?, ?)",
-          [pagoId, factura.id, montoAplicar]
-        );
-        await connection.execute('UPDATE facturas SET estado = "pagado" WHERE id = ?', [factura.id]);
+        // Obtener todos los conceptos de esta factura (cuota + intereses, etc.)
+        const [conceptosFactura] = await connection.execute(`
+          SELECT concepto, monto 
+          FROM detalle_factura 
+          WHERE factura_id = ? 
+          ORDER BY id ASC
+        `, [factura.id]);
 
+        const totalFactura = conceptosFactura.reduce((sum, c) => sum + Number(c.monto), 0);
+
+        if (totalFactura <= 0) continue;
+
+        const montoAplicar = Math.min(restante, totalFactura);
+
+        // Registrar la aplicación del pago
+        await connection.execute(`
+          INSERT INTO pago_factura (pago_id, factura_id, monto_aplicado)
+          VALUES (?, ?, ?)
+        `, [pagoId, factura.id, montoAplicar]);
+
+        // Guardar detalle enriquecido para el PDF
         detalleAplicado.push({
           factura_id: factura.id,
           monto_aplicado: montoAplicar,
-          concepto: "Cuota + intereses",
+          total_factura: totalFactura,
+          conceptos: conceptosFactura.map(c => ({
+            concepto: c.concepto,
+            monto_original: Number(c.monto)
+          }))
         });
+
         restante -= montoAplicar;
+
+        // Recalcular saldo real de la factura
+        const [saldoRes] = await connection.execute(`
+          SELECT 
+            (SELECT COALESCE(SUM(monto),0) FROM detalle_factura WHERE factura_id = ?) -
+            (SELECT COALESCE(SUM(monto_aplicado),0) FROM pago_factura WHERE factura_id = ?)
+            AS saldo
+        `, [factura.id, factura.id]);
+
+        const saldo = Number(saldoRes[0].saldo);
+
+        let nuevoEstado = 'pagado';
+        if (saldo > 0.01) nuevoEstado = 'parcial';
+
+        await connection.execute(`UPDATE facturas SET estado = ? WHERE id = ?`, [nuevoEstado, factura.id]);
       }
     }
 
+    // Generar recibo PDF con detalle completo (incluye intereses)
     const reciboUrl = await generarReciboPDF(
-      { id: pagoId, monto, metodo_pago: metodo, fecha_pago: new Date() },
+      { 
+        id: pagoId, 
+        monto, 
+        metodo_pago: metodo, 
+        fecha_pago: new Date(), 
+        recibo_num: reciboNum 
+      },
       socio,
       detalleAplicado
     );
@@ -174,12 +188,14 @@ const registrarPago = async (req, res) => {
 
     res.json({
       success: true,
-      message:
-        monto >= deudaActual && deudaActual > 0
-          ? "Pago registrado exitosamente - PAGO COMPLETO"
-          : "Pago registrado como adelantado",
+      message: restante <= 0 && deudaActual > 0
+        ? "Pago completo registrado exitosamente"
+        : deudaActual === 0
+        ? "Pago adelantado registrado"
+        : "Pago parcial registrado",
       recibo_url: reciboUrl,
     });
+
   } catch (error) {
     if (connection) await connection.rollback();
     console.error("Error al procesar pago:", error);
