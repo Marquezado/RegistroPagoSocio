@@ -27,4 +27,29 @@ router.post('/registrar', async (req, res) => {
   }
 });
 
+router.get('/lista', async (req, res) => {
+  try {
+    const [socios] = await db.execute(`
+      SELECT id, dni, nombre, telefono, tipo_socio, estado 
+      FROM socios 
+      ORDER BY nombre ASC
+    `);
+
+    res.json({
+      success: true,
+      socios: socios.map(s => ({
+        id: s.id,
+        dni: s.dni,
+        nombre: s.nombre,
+        telefono: s.telefono || '-',
+        tipo_socio: s.tipo_socio,
+        estado: s.estado
+      }))
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: "Error al obtener lista de socios" });
+  }
+});
+
 module.exports = router;

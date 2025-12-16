@@ -9,22 +9,22 @@ importers:
   .:
     dependencies:
       bcrypt:
-        specifier: ^6.0.0
+        specifier: 6.0.0
         version: 6.0.0
       dotenv:
-        specifier: ^17.2.3
+        specifier: 17.2.3
         version: 17.2.3
       express:
-        specifier: ^5.2.1
+        specifier: 5.2.1
         version: 5.2.1
       express-session:
-        specifier: ^1.18.2
+        specifier: 1.18.2
         version: 1.18.2
       mysql2:
-        specifier: ^3.15.3
+        specifier: 3.15.3
         version: 3.15.3
       pdfkit:
-        specifier: ^0.17.2
+        specifier: 0.17.2
         version: 0.17.2
     devDependencies:
       nodemon:

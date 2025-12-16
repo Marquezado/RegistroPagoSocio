@@ -1,195 +1,288 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Registrar Pago - Club Atenas</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="../css/registrar-pago.css">
-  </head>
-  <body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registrar Pago - Club Atenas</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="../css/registrar-pago.css">
+</head>
+<body>
+  <div class="header">
     <div class="container">
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Registrar Pago</h2>
+      <div class="d-flex justify-content-between align-items-center">
         <div>
-          <a href="/html/menu.html" class="btn btn-secondary me-2">Volver al menú</a>
-          <a href="/auth/logout" class="btn btn-outline-danger">Cerrar Sesión</a>
+          <h1 class="mb-0 fw-bold">Registrar Pago</h1>
+          <p class="mb-0 opacity-90">Club Atenas - Sistema de Gestión</p>
+        </div>
+        <div>
+          <a href="/html/menu.html" class="btn btn-outline-light me-2">Volver al menú</a>
+          <a href="/auth/logout" class="btn btn-outline-light">Cerrar Sesión</a>
         </div>
       </div>
+    </div>
+  </div>
 
-      <div class="card">
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-6">
-              <label class="form-label">DNI del socio</label>
-              <div class="input-group mb-3">
-                <input type="text" id="dni" class="form-control" placeholder="Ej. 71234567" maxlength="8" />
-                <button class="btn btn-primary" id="cargarBtn">Cargar socio</button>
-              </div>
+  <div class="container">
+    <!-- Tabla de socios registrados -->
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-people me-2"></i>Lista de Socios Registrados</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-container">
+          <table class="table table-striped table-hover mb-0" id="tablaSocios">
+            <thead>
+              <tr>
+                <th>DNI</th>
+                <th>Nombre Completo</th>
+                <th>Teléfono</th>
+                <th>Tipo de Socio</th>
+                <th>Estado</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Se llena con JS -->
+            </tbody>
+          </table>
+        </div>
+        <div id="tablaMensaje" class="p-4 text-center text-muted"></div>
+      </div>
+    </div>
+
+    <!-- Formulario de búsqueda por DNI -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row justify-content-center">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">DNI del socio</label>
+            <div class="input-group input-group-lg">
+              <input type="text" id="dni" class="form-control" placeholder="Ej. 71234567" maxlength="8" />
+              <button class="btn btn-primary" id="cargarBtn">
+                <i class="bi bi-search me-2"></i>Cargar Socio
+              </button>
             </div>
           </div>
-
-          <div id="infoSocio" class="mt-4" style="display: none">
-            <div class="alert alert-info">
-              <strong>Socio:</strong> <span id="nombreSocio"></span> |
-              <strong>Deuda actual:</strong> S/ <span id="deudaActual">0.00</span>
-            </div>
-
-            <hr />
-
-            <form id="pagoForm">
-              <div class="row">
-                <div class="col-md-6">
-                  <label class="form-label">Monto a pagar</label>
-                  <input type="number" step="0.01" id="monto" class="form-control" required min="0.01" />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Método de pago</label>
-                  <select id="metodo" class="form-select" required>
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="Tarjeta">Tarjeta</option>
-                    <option value="Transferencia">Transferencia</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="mt-4">
-                <button type="submit" class="btn btn-success btn-lg">
-                  Confirmar y Registrar Pago
-                </button>
-              </div>
-            </form>
-
-            <div id="mensaje" class="mt-3"></div>
-          </div>
-
-          <div id="mensajeGeneral" class="mt-3"></div>
         </div>
       </div>
     </div>
 
-    <script>
-      let socioId = null;
-      let deudaActual = 0;
+    <!-- Información del socio y formulario de pago -->
+    <div id="infoSocio" style="display: none">
+      <div class="card">
+        <div class="card-body">
+          <div class="alert alert-info text-center mb-4">
+            <strong>Socio:</strong> <span id="nombreSocio"></span> |
+            <strong>Deuda actual:</strong> S/ <span id="deudaActual">0.00</span>
+          </div>
 
-      const mostrarMensaje = (texto, tipo = "danger") => {
-        const mensajeGeneral = document.getElementById("mensajeGeneral");
-        mensajeGeneral.innerHTML = `<div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
-          ${texto}
-          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>`;
-      };
+          <hr />
 
-      document.getElementById("cargarBtn").addEventListener("click", async () => {
-        const dni = document.getElementById("dni").value.trim();
-        const infoSocio = document.getElementById("infoSocio");
-        const mensajeGeneral = document.getElementById("mensajeGeneral");
-        mensajeGeneral.innerHTML = "";
+          <form id="pagoForm" class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Monto a pagar</label>
+              <input type="number" step="0.01" id="monto" class="form-control form-control-lg" required min="0.01" />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">Método de pago</label>
+              <select id="metodo" class="form-select form-select-lg" required>
+                <option value="Efectivo">Efectivo</option>
+                <option value="Tarjeta">Tarjeta</option>
+                <option value="Transferencia">Transferencia</option>
+              </select>
+            </div>
+            <div class="col-12 text-center mt-4">
+              <button type="submit" class="btn btn-success btn-lg px-5">
+                <i class="bi bi-check-circle me-2"></i>Confirmar y Registrar Pago
+              </button>
+            </div>
+          </form>
 
-        if (!dni || dni.length !== 8 || isNaN(dni)) {
-          mostrarMensaje("Ingrese un DNI válido de 8 dígitos", "warning");
+          <div id="mensaje" class="mt-4"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="mensajeGeneral" class="mt-4"></div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p class="mb-0">&copy; 2025 Club Atenas. Sistema de Gestión de Socios.</p>
+    </div>
+  </footer>
+
+  <script>
+    let socioId = null;
+    let deudaActual = 0;
+
+    // Función para mostrar mensajes generales
+    const mostrarMensaje = (texto, tipo = "danger") => {
+      const mensajeGeneral = document.getElementById("mensajeGeneral");
+      mensajeGeneral.innerHTML = `<div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
+        ${texto}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>`;
+    };
+
+    // Cargar lista de socios al iniciar la página
+    document.addEventListener('DOMContentLoaded', async () => {
+      const tbody = document.querySelector('#tablaSocios tbody');
+      const mensaje = document.getElementById('tablaMensaje');
+
+      try {
+        const res = await fetch('/api/socios/lista', { credentials: 'include' });
+        const data = await res.json();
+
+        if (!data.success || data.socios.length === 0) {
+          mensaje.innerHTML = '<p class="text-muted">No hay socios registrados aún.</p>';
           return;
         }
 
-        try {
-          const res = await fetch(`/api/pagos/estado-cuenta/${dni}`, {
-            credentials: "include"
+        tbody.innerHTML = '';
+        data.socios.forEach(socio => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><strong>${socio.dni}</strong></td>
+            <td>${socio.nombre}</td>
+            <td>${socio.telefono || '-'}</td>
+            <td><span class="badge bg-secondary">${socio.tipo_socio}</span></td>
+            <td><span class="badge ${socio.estado === 'activo' ? 'bg-success' : 'bg-danger'}">${socio.estado}</span></td>
+            <td>
+              <button class="btn btn-sm btn-primary seleccionar-socio" data-dni="${socio.dni}">
+                <i class="bi bi-check2"></i> Seleccionar
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        // Evento para seleccionar socio desde la tabla
+        document.querySelectorAll('.seleccionar-socio').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const dni = e.target.closest('button').dataset.dni;
+            document.getElementById('dni').value = dni;
+            document.getElementById('cargarBtn').click(); // Ejecuta carga automáticamente
           });
+        });
 
-          if (!res.ok) {
-            const errorText = await res.text();
-            console.error("Error HTTP al cargar socio:", res.status, errorText);
-            if (res.status === 401) {
-              mostrarMensaje("Sesión expirada o no autorizada. Por favor, inicia sesión nuevamente.", "danger");
-            } else {
-              mostrarMensaje(`Error ${res.status}: ${res.statusText}`, "danger");
-            }
-            infoSocio.style.display = "none";
-            return;
-          }
+      } catch (err) {
+        mensaje.innerHTML = '<p class="text-danger">Error al cargar la lista de socios.</p>';
+      }
+    });
 
-          const data = await res.json();
+    // Cargar información del socio
+    document.getElementById("cargarBtn").addEventListener("click", async () => {
+      const dni = document.getElementById("dni").value.trim();
+      const infoSocio = document.getElementById("infoSocio");
+      infoSocio.style.display = "none";
+      document.getElementById("mensajeGeneral").innerHTML = "";
 
-          if (!data.success) {
-            mostrarMensaje(data.message || "Socio no encontrado", "danger");
-            infoSocio.style.display = "none";
-            return;
-          }
+      if (!dni || dni.length !== 8 || isNaN(dni)) {
+        mostrarMensaje("Ingrese un DNI válido de 8 dígitos", "warning");
+        return;
+      }
 
-          socioId = data.socio.id;
-          deudaActual = Number(data.deuda_total) || 0;
+      try {
+        const res = await fetch(`/api/pagos/estado-cuenta/${dni}`, {
+          credentials: "include"
+        });
 
-          document.getElementById("nombreSocio").textContent =
-            `${data.socio.nombre} (DNI: ${data.socio.dni})`;
-          document.getElementById("deudaActual").textContent = deudaActual.toFixed(2);
-
-          infoSocio.style.display = "block";
-          document.getElementById("monto").value = deudaActual > 0 ? deudaActual.toFixed(2) : "";
-          
-          mostrarMensaje("Socio cargado correctamente", "success");
-        } catch (err) {
-          console.error("Error de conexión:", err);
-          mostrarMensaje("Error de conexión. Asegúrate de haber iniciado sesión desde el menú principal.", "danger");
-        }
-      });
-
-      document.getElementById("pagoForm").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const monto = parseFloat(document.getElementById("monto").value);
-        const metodo = document.getElementById("metodo").value;
-        const mensaje = document.getElementById("mensaje");
-
-        if (isNaN(monto) || monto <= 0) {
-          mensaje.innerHTML = '<div class="alert alert-warning">Ingrese un monto válido mayor a 0</div>';
-          return;
-        }
-
-        mensaje.innerHTML = '<div class="alert alert-info">Procesando pago...</div>';
-
-        try {
-          const res = await fetch("/api/pagos/registrar", {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ socio_id: socioId, monto, metodo })
-          });
-
-          if (!res.ok) {
-            const errorText = await res.text();
-            console.error("Error HTTP al registrar pago:", res.status, errorText);
-            if (res.status === 401) {
-              mensaje.innerHTML = '<div class="alert alert-danger">Sesión no autorizada. Por favor, inicia sesión nuevamente.</div>';
-            } else {
-              mensaje.innerHTML = `<div class="alert alert-danger">Error ${res.status}: ${res.statusText}</div>`;
-            }
-            return;
-          }
-
-          const data = await res.json();
-
-          if (data.success) {
-            mensaje.innerHTML = `<div class="alert alert-success"><strong>${data.message}</strong></div>`;
-            if (data.recibo_url) {
-              const btn = document.createElement("a");
-              btn.href = data.recibo_url;
-              btn.className = "btn btn-primary mt-3";
-              btn.textContent = "Descargar Recibo PDF";
-              btn.target = "_blank";
-              btn.rel = "noopener";
-              mensaje.appendChild(document.createElement("br"));
-              mensaje.appendChild(btn);
-            }
-            setTimeout(() => location.reload(), 4000);
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("Error HTTP:", res.status, errorText);
+          if (res.status === 401) {
+            mostrarMensaje("Sesión expirada. Inicia sesión nuevamente.", "danger");
           } else {
-            mensaje.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+            mostrarMensaje(`Error ${res.status}: ${res.statusText}`, "danger");
           }
-        } catch (err) {
-          console.error("Error al registrar pago:", err);
-          mensaje.innerHTML = '<div class="alert alert-danger">Error de conexión o sesión expirada. Intenta nuevamente.</div>';
+          return;
         }
-      });
-    </script>
-  </body>
+
+        const data = await res.json();
+
+        if (!data.success) {
+          mostrarMensaje(data.message || "Socio no encontrado", "danger");
+          return;
+        }
+
+        socioId = data.socio.id;
+        deudaActual = Number(data.deuda_total) || 0;
+
+        document.getElementById("nombreSocio").textContent = `${data.socio.nombre} (DNI: ${data.socio.dni})`;
+        document.getElementById("deudaActual").textContent = deudaActual.toFixed(2);
+        document.getElementById("monto").value = deudaActual > 0 ? deudaActual.toFixed(2) : "";
+
+        infoSocio.style.display = "block";
+        mostrarMensaje("Socio cargado correctamente", "success");
+
+        // Scroll suave al formulario
+        infoSocio.scrollIntoView({ behavior: "smooth" });
+
+      } catch (err) {
+        console.error("Error:", err);
+        mostrarMensaje("Error de conexión. Verifica tu sesión.", "danger");
+      }
+    });
+
+    // Registrar pago
+    document.getElementById("pagoForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const monto = parseFloat(document.getElementById("monto").value);
+      const metodo = document.getElementById("metodo").value;
+      const mensaje = document.getElementById("mensaje");
+
+      if (isNaN(monto) || monto <= 0) {
+        mensaje.innerHTML = '<div class="alert alert-warning">Ingrese un monto válido mayor a 0</div>';
+        return;
+      }
+
+      mensaje.innerHTML = '<div class="alert alert-info">Procesando pago...</div>';
+
+      try {
+        const res = await fetch("/api/pagos/registrar", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ socio_id: socioId, monto, metodo })
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("Error HTTP:", res.status, errorText);
+          if (res.status === 401) {
+            mensaje.innerHTML = '<div class="alert alert-danger">Sesión no autorizada. Inicia sesión nuevamente.</div>';
+          } else {
+            mensaje.innerHTML = `<div class="alert alert-danger">Error ${res.status}: ${res.statusText}</div>`;
+          }
+          return;
+        }
+
+        const data = await res.json();
+
+        if (data.success) {
+          mensaje.innerHTML = `<div class="alert alert-success"><strong>${data.message}</strong></div>`;
+          if (data.recibo_url) {
+            const btn = document.createElement("a");
+            btn.href = data.recibo_url;
+            btn.className = "btn btn-primary mt-3";
+            btn.textContent = "Descargar Recibo PDF";
+            btn.target = "_blank";
+            btn.rel = "noopener";
+            mensaje.appendChild(document.createElement("br"));
+            mensaje.appendChild(btn);
+          }
+          setTimeout(() => location.reload(), 4000);
+        } else {
+          mensaje.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+        }
+      } catch (err) {
+        console.error("Error:", err);
+        mensaje.innerHTML = '<div class="alert alert-danger">Error de conexión o sesión expirada.</div>';
+      }
+    });
+  </script>
+</body>
 </html>
